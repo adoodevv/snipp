@@ -50,9 +50,9 @@ export function EditSnippetModal({ isOpen, onClose, snippet, latestCode }: EditS
             />
 
             {/* Modal */}
-            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4 z-10">
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-6 z-10">
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex items-center justify-between rounded-t-2xl">
                     <div>
                         <h2 className="text-xl font-semibold text-gray-900">Edit Snippet</h2>
                         <p className="text-sm text-gray-500">Changes will create a new version</p>
@@ -67,7 +67,7 @@ export function EditSnippetModal({ isOpen, onClose, snippet, latestCode }: EditS
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
                     <input type="hidden" name="snippetId" value={snippet.id} />
 
                     {error && (

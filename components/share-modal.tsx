@@ -74,7 +74,7 @@ export function ShareModal({
         >
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                             <HiOutlineLink className="w-5 h-5 text-orange-600" />
@@ -93,24 +93,24 @@ export function ShareModal({
                 </div>
 
                 {/* Content */}
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     <p className="text-sm text-gray-600 mb-4">
                         Share this link to collaborate on <span className="font-medium text-gray-900">&quot;{snippetTitle}&quot;</span>
                     </p>
 
                     {/* Link input with copy button */}
-                    <div className="flex items-center gap-2">
-                        <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex-1 flex items-center bg-gray-50 border border-gray-200 rounded-lg overflow-hidden min-w-0">
                             <input
                                 type="text"
                                 readOnly
                                 value={shareUrl}
-                                className="flex-1 px-4 py-3 bg-transparent text-sm text-gray-700 outline-none"
+                                className="flex-1 px-4 py-3 bg-transparent text-sm text-gray-700 outline-none min-w-0"
                             />
                         </div>
                         <button
                             onClick={handleCopy}
-                            className={`flex items-center gap-2 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 ${copied
+                            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium text-sm transition-all duration-200 flex-shrink-0 ${copied
                                 ? 'bg-green-500 text-white'
                                 : 'bg-orange-500 hover:bg-orange-600 text-white'
                                 }`}

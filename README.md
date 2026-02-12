@@ -7,6 +7,16 @@ Run the migration in your Supabase project to create the snippets tables:
 1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) → SQL Editor
 2. Copy and run the contents of `supabase/migrations/00001_create_snippets.sql`
 
+**Realtime (Broadcast & Presence)** is used for collaborative editing. It's enabled by default in Supabase—no extra setup needed.
+
+**Collaborative save** requires the service role key so collaborators (with share link) can save. Add to `.env.local`:
+
+```
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+Find it in Supabase Dashboard → Project Settings → API Keys → `service_role` (secret).
+
 ## Getting Started
 
 First, run the development server:

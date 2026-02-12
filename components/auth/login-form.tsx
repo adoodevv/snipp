@@ -74,7 +74,7 @@ export function LoginForm() {
 
     return (
         <div className="w-full max-w-xl mx-auto px-4">
-            <div className="app-card p-8">
+            <div className="app-card p-6 sm:p-8">
                 <div className="mb-6 text-center space-y-2">
                     <p className="text-xs font-semibold tracking-[0.2em] uppercase text-orange-500">
                         Welcome back

@@ -11,7 +11,7 @@ export default async function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen relative flex items-center justify-center bg-white px-4">
+        <div className="min-h-screen relative flex items-center justify-center bg-white px-4 py-8 sm:py-12">
             <div
                 className="absolute inset-0 opacity-30"
                 style={{

@@ -65,7 +65,7 @@ export function SnippetContent({
 
     return (
         <>
-            <div className="w-full pb-24">
+            <div className="w-full pb-36 lg:pb-24">
                 {/* Mobile Header - replaced by sidebar on desktop */}
                 <header className="lg:hidden mb-6 flex justify-between items-center pb-4 border-b border-gray-200">
                     <Link
