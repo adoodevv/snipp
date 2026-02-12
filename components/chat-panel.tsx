@@ -208,13 +208,13 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
     return (
         <div className={containerClasses}>
             {/* Top bar: conversations + new + save */}
-            <div className="flex-shrink-0 flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200">
-                <div className="flex items-center gap-2 min-w-0" ref={dropdownRef}>
+            <div className="flex-shrink-0 flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-200">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0" ref={dropdownRef}>
                     <div className="relative">
                         <button
                             type="button"
                             onClick={() => setShowConvDropdown(!showConvDropdown)}
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium max-w-[200px] sm:max-w-[280px] truncate"
+                            className="flex items-center gap-2 px-2.5 sm:px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs sm:text-sm font-medium max-w-[200px] sm:max-w-[280px] truncate"
                         >
                             <LuMessageSquare className="w-4 h-4 flex-shrink-0" />
                             <span className="truncate">
@@ -223,7 +223,7 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                             <LuChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${showConvDropdown ? 'rotate-180' : ''}`} />
                         </button>
                         {showConvDropdown && (
-                            <div className="absolute left-0 top-full mt-1 w-64 max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2">
+                            <div className="absolute left-0 top-full mt-1 w-full min-w-[200px] sm:w-64 max-w-[calc(100vw-2rem)] max-h-60 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-2">
                                 <button
                                     type="button"
                                     onClick={handleNewConversation}
@@ -238,16 +238,14 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                                         {conversations.map((c) => (
                                             <div
                                                 key={c.id}
-                                                className={`group flex items-center gap-1 ${
-                                                    conversationId === c.id ? 'bg-orange-50' : ''
-                                                }`}
+                                                className={`group flex items-center gap-1 ${conversationId === c.id ? 'bg-orange-50' : ''
+                                                    }`}
                                             >
                                                 <button
                                                     type="button"
                                                     onClick={() => handleLoadConversation(c)}
-                                                    className={`flex-1 min-w-0 px-4 py-2.5 text-left text-sm truncate hover:bg-gray-50 ${
-                                                        conversationId === c.id ? 'text-orange-700' : 'text-gray-700'
-                                                    }`}
+                                                    className={`flex-1 min-w-0 px-4 py-2.5 text-left text-sm truncate hover:bg-gray-50 ${conversationId === c.id ? 'text-orange-700' : 'text-gray-700'
+                                                        }`}
                                                 >
                                                     {c.title}
                                                 </button>
@@ -279,7 +277,7 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                     <button
                         type="button"
                         onClick={handleNewConversation}
-                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+                        className="p-2 rounded-lg hover:bg-gray-100 text-gray-600 flex-shrink-0"
                         title="New conversation"
                     >
                         <LuPlus className="w-4 h-4" />
@@ -289,7 +287,7 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                     <button
                         type="button"
                         onClick={handleSave}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium"
+                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs sm:text-sm font-medium flex-shrink-0"
                     >
                         <LuSave className="w-4 h-4" />
                         Save
@@ -312,25 +310,24 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
             <div className={isFullView ? 'flex-1 flex flex-col min-h-0' : 'flex-1 flex flex-col min-h-[400px]'}>
                 {hasMessages ? (
                     <>
-                        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+                        <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
                             {messages.map((m, i) => (
                                 <div
                                     key={i}
                                     className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
                                     <div
-                                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                                            m.role === 'user'
+                                        className={`max-w-[90%] sm:max-w-[85%] rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 ${m.role === 'user'
                                                 ? 'bg-orange-500 text-white'
                                                 : 'bg-gray-100 text-gray-900'
-                                        }`}
+                                            }`}
                                     >
                                         {m.role === 'user' ? (
-                                            <p className="text-sm sm:text-base text-white whitespace-pre-wrap break-words">
+                                            <p className="text-xs sm:text-sm md:text-base text-white whitespace-pre-wrap break-words">
                                                 {m.content}
                                             </p>
                                         ) : (
-                                            <div className="text-sm sm:text-base [&_*]:last:mb-0">
+                                            <div className="text-xs sm:text-sm md:text-base [&_*]:last:mb-0">
                                                 <MarkdownContent content={m.content} />
                                             </div>
                                         )}
@@ -350,32 +347,32 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 sm:py-12">
-                        <div className="mb-8 text-center">
-                            <h1 className="text-3xl sm:text-4xl font-semibold text-gray-900 mb-2">
-                                Sni<span className="text-orange-500 text-3xl sm:text-4xl font-semibold">pp</span> AI
+                    <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-12">
+                        <div className="mb-6 sm:mb-8 text-center">
+                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 mb-2">
+                                Sni<span className="text-orange-500 text-2xl sm:text-3xl md:text-4xl font-semibold">pp</span> AI
                             </h1>
-                            <p className="text-gray-500 text-sm sm:text-base">
+                            <p className="text-gray-500 text-xs sm:text-sm md:text-base">
                                 Search your snippets with AI
                             </p>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-center gap-2 mb-8">
+                        <div className="flex flex-wrap items-center justify-center gap-2 mb-6 sm:mb-8">
                             <button
                                 onClick={() => handleQuickAction('Find snippets')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200"
+                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200"
                             >
                                 Find snippets
                             </button>
                             <button
                                 onClick={() => handleQuickAction('Explain code')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200"
+                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200"
                             >
                                 Explain code
                             </button>
                             <button
                                 onClick={() => handleQuickAction('Generate snippet')}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200"
+                                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 transition-colors duration-200"
                             >
                                 Generate snippet
                             </button>
@@ -383,12 +380,12 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                     </div>
                 )}
 
-                <div className="flex-shrink-0 px-4 pb-6">
+                <div className="flex-shrink-0 px-3 sm:px-4 pb-6">
                     <div className="w-full max-w-2xl mx-auto">
                         {error && (
-                            <p className="text-sm text-red-500 mb-2">{error}</p>
+                            <p className="text-xs sm:text-sm text-red-500 mb-2">{error}</p>
                         )}
-                        <div className="flex items-end gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 sm:px-5 py-3 focus-within:ring-2 focus-within:ring-orange-400 focus-within:border-transparent focus-within:bg-white transition-all duration-200">
+                        <div className="flex items-end gap-2 sm:gap-3 bg-gray-50 border border-gray-200 rounded-xl sm:rounded-2xl px-3 sm:px-5 py-2.5 sm:py-3 focus-within:ring-2 focus-within:ring-orange-400 focus-within:border-transparent focus-within:bg-white transition-all duration-200">
                             <textarea
                                 ref={textareaRef}
                                 value={message}
@@ -397,12 +394,12 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                                 placeholder="What do you want to know?"
                                 rows={1}
                                 disabled={isLoading}
-                                className="flex-1 min-w-0 bg-transparent border-none outline-none text-gray-900 placeholder:text-gray-400 text-base resize-none overflow-y-auto max-h-[200px] py-1 disabled:opacity-70"
+                                className="flex-1 min-w-0 bg-transparent border-none outline-none text-gray-900 placeholder:text-gray-400 text-sm sm:text-base resize-none overflow-y-auto max-h-[150px] sm:max-h-[200px] py-1 disabled:opacity-70"
                             />
                             <button
                                 onClick={handleSend}
                                 disabled={!message.trim() || isLoading}
-                                className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors duration-200"
+                                className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-200 disabled:cursor-not-allowed flex items-center justify-center transition-colors duration-200"
                             >
                                 <FaArrowUp className="w-4 h-4 text-white" />
                             </button>

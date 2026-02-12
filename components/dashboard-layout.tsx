@@ -25,23 +25,22 @@ export function DashboardLayout({ snippets, user, children }: DashboardLayoutPro
     const isNewSnippetPage = pathname === '/new';
     const isHomePage = pathname === '/';
 
-    // Chat is open by default when on the home page (not viewing a snippet or creating new)
-    const [isChatOpen, setIsChatOpen] = useState(isHomePage);
+    // Chat is closed by default on home so snippets show first; user taps Chat to open it
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     // Update chat state when pathname changes
     useEffect(() => {
         if (isSnippetSelected || isNewSnippetPage) {
             setIsChatOpen(false);
-        } else if (isHomePage) {
-            // When navigating back to home, show chat
-            setIsChatOpen(true);
         }
+        // On home, keep current state (don't auto-open chat)
     }, [pathname, isSnippetSelected, isNewSnippetPage, isHomePage]);
 
     const handleChatToggle = () => {
-        // If we're on a snippet or new page, navigate to home (which shows chat)
+        // If we're on a snippet or new page, navigate to home first
         if (isSnippetSelected || isNewSnippetPage) {
             router.push('/');
+            setIsChatOpen(true); // Open chat when navigating from elsewhere
         } else {
             // On home page, toggle chat
             setIsChatOpen(!isChatOpen);
@@ -63,8 +62,8 @@ export function DashboardLayout({ snippets, user, children }: DashboardLayoutPro
                 />
             </div>
 
-            {/* Main Content Area */}
-            <main className="lg:ml-72 min-h-screen flex justify-center pb-20 lg:pb-0">
+            {/* Main Content Area - pb for mobile nav clearance */}
+            <main className="lg:ml-72 min-h-screen flex justify-center pb-24 lg:pb-0">
                 <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
                     {showChat ? (
                         <ChatPanel isFullView snippets={snippets} />
@@ -74,16 +73,27 @@ export function DashboardLayout({ snippets, user, children }: DashboardLayoutPro
                 </div>
             </main>
 
-            {/* Mobile bottom nav - when sidebar is hidden */}
-            <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]">
+            {/* Mobile bottom nav - fixed at bottom, does not scroll */}
+            <nav className="lg:hidden fixed inset-x-0 bottom-0 bg-white border-t border-gray-200 z-50 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))]">
                 <div className="flex items-center justify-around px-4 max-w-lg mx-auto">
-                    <Link
-                        href="/"
-                        className={`flex flex-col items-center gap-1 py-2 px-4 rounded-lg transition-colors ${pathname === '/' ? 'text-orange-500' : 'text-gray-600'}`}
-                    >
-                        <LuHouse className="w-5 h-5" />
-                        <span className="text-xs font-medium">Home</span>
-                    </Link>
+                    {pathname === '/' && showChat ? (
+                        <button
+                            type="button"
+                            onClick={() => setIsChatOpen(false)}
+                            className="flex flex-col items-center gap-1 py-2 px-4 rounded-lg transition-colors text-gray-600"
+                        >
+                            <LuHouse className="w-5 h-5" />
+                            <span className="text-xs font-medium">Home</span>
+                        </button>
+                    ) : (
+                        <Link
+                            href="/"
+                            className={`flex flex-col items-center gap-1 py-2 px-4 rounded-lg transition-colors ${pathname === '/' && !showChat ? 'text-orange-500' : 'text-gray-600'}`}
+                        >
+                            <LuHouse className="w-5 h-5" />
+                            <span className="text-xs font-medium">Home</span>
+                        </Link>
+                    )}
                     <Link
                         href="/new"
                         className={`flex flex-col items-center gap-1 py-2 px-4 rounded-lg transition-colors ${pathname === '/new' ? 'text-orange-500' : 'text-gray-600'}`}
