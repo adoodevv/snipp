@@ -26,3 +26,23 @@ export interface SnippetWithLatestVersion extends Snippet {
 export interface SnippetWithVersions extends Snippet {
     versions: SnippetVersion[];
 }
+
+export interface AiMessage {
+    id: string;
+    conversation_id: string;
+    role: 'user' | 'model';
+    content: string;
+    created_at: string;
+}
+
+export interface AiConversation {
+    id: string;
+    user_id: string;
+    title: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface AiConversationWithMessages extends AiConversation {
+    messages: AiMessage[];
+}

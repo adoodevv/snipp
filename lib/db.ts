@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import type { SnippetWithLatestVersion, SnippetWithVersions } from "@/types/database";
+import type { SnippetWithLatestVersion, SnippetWithVersions, AiConversation, AiConversationWithMessages } from "@/types/database";
 
 export async function getSnippetsByUserId(userId: string): Promise<SnippetWithLatestVersion[]> {
     const supabase = await createClient();
@@ -104,4 +104,114 @@ export async function validateCollabToken(snippetId: string, token: string): Pro
         .single();
 
     return data?.collab_token === token;
+}
+
+export async function getConversationsByUserId(userId: string): Promise<AiConversation[]> {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+        .from("ai_conversations")
+        .select("id, user_id, title, created_at, updated_at")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false });
+
+    if (error) {
+        console.error("getConversationsByUserId error:", error);
+        return [];
+    }
+
+    return (data || []) as AiConversation[];
+}
+
+export async function getConversationWithMessages(id: string): Promise<AiConversationWithMessages | null> {
+    const supabase = await createClient();
+
+    const { data: conv, error: convError } = await supabase
+        .from("ai_conversations")
+        .select("id, user_id, title, created_at, updated_at")
+        .eq("id", id)
+        .single();
+
+    if (convError || !conv) return null;
+
+    const { data: messages } = await supabase
+        .from("ai_messages")
+        .select("id, conversation_id, role, content, created_at")
+        .eq("conversation_id", id)
+        .order("created_at", { ascending: true });
+
+    return {
+        ...conv,
+        messages: (messages || []).map((m) => ({
+            id: m.id,
+            conversation_id: m.conversation_id,
+            role: m.role as 'user' | 'model',
+            content: m.content,
+            created_at: m.created_at,
+        })),
+    } as AiConversationWithMessages;
+}
+
+export async function createConversation(userId: string, title: string, messages: { role: string; content: string }[]): Promise<AiConversation | null> {
+    const supabase = await createClient();
+
+    const { data: conv, error: convError } = await supabase
+        .from("ai_conversations")
+        .insert({ user_id: userId, title })
+        .select("id, user_id, title, created_at, updated_at")
+        .single();
+
+    if (convError || !conv) return null;
+
+    if (messages.length > 0) {
+        await supabase.from("ai_messages").insert(
+            messages.map((m) => ({
+                conversation_id: conv.id,
+                role: m.role,
+                content: m.content,
+            }))
+        );
+    }
+
+    return conv as AiConversation;
+}
+
+export async function appendMessagesToConversation(conversationId: string, messages: { role: string; content: string }[]): Promise<boolean> {
+    const supabase = await createClient();
+
+    const { error } = await supabase.from("ai_messages").insert(
+        messages.map((m) => ({
+            conversation_id: conversationId,
+            role: m.role,
+            content: m.content,
+        }))
+    );
+
+    if (error) return false;
+
+    await supabase
+        .from("ai_conversations")
+        .update({ updated_at: new Date().toISOString() })
+        .eq("id", conversationId);
+
+    return true;
+}
+
+export async function updateConversationTitle(id: string, title: string): Promise<boolean> {
+    const supabase = await createClient();
+
+    const { error } = await supabase
+        .from("ai_conversations")
+        .update({ title, updated_at: new Date().toISOString() })
+        .eq("id", id);
+
+    return !error;
+}
+
+export async function deleteConversation(id: string): Promise<boolean> {
+    const supabase = await createClient();
+
+    const { error } = await supabase.from("ai_conversations").delete().eq("id", id);
+
+    return !error;
 }

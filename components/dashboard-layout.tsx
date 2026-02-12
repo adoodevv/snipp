@@ -67,7 +67,7 @@ export function DashboardLayout({ snippets, user, children }: DashboardLayoutPro
             <main className="lg:ml-72 min-h-screen flex justify-center pb-20 lg:pb-0">
                 <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
                     {showChat ? (
-                        <ChatPanel isFullView />
+                        <ChatPanel isFullView snippets={snippets} />
                     ) : (
                         children
                     )}

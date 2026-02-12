@@ -204,7 +204,11 @@ export function SnippetContent({
                 </div>
 
                 {/* Fixed AI Help Bar */}
-                <SnippetHelpBar snippetTitle={snippet.title} />
+                <SnippetHelpBar
+                    snippetTitle={snippet.title}
+                    snippetCode={latestVersion.code}
+                    snippetLanguage={snippet.language}
+                />
             </div>
 
             {/* Share Modal - for public snippets (owner only) */}

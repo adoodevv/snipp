@@ -2,20 +2,23 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Database Setup (Supabase)
 
-Run the migration in your Supabase project to create the snippets tables:
+Run the migrations in your Supabase project:
 
 1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) → SQL Editor
 2. Copy and run the contents of `supabase/migrations/00001_create_snippets.sql`
+3. Copy and run the contents of `supabase/migrations/00002_create_ai_conversations.sql` (for AI chat history)
 
 **Realtime (Broadcast & Presence)** is used for collaborative editing. It's enabled by default in Supabase—no extra setup needed.
 
-**Collaborative save** requires the service role key so collaborators (with share link) can save. Add to `.env.local`:
+**Collaborative save** requires the service role key. **AI chat** requires a Gemini API key. Add to `.env.local`:
 
 ```
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
-Find it in Supabase Dashboard → Project Settings → API Keys → `service_role` (secret).
+- Supabase keys: Dashboard → Project Settings → API Keys
+- Gemini key: [Google AI Studio](https://aistudio.google.com/apikey)
 
 ## Getting Started
 
