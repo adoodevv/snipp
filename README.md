@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Database Setup (Supabase)
+
+Run the migration in your Supabase project to create the snippets tables:
+
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) → SQL Editor
+2. Copy and run the contents of `supabase/migrations/00001_create_snippets.sql`
+
 ## Getting Started
 
 First, run the development server:

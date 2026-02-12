@@ -1,0 +1,29 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
+
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+    const next = searchParams.get("next") ?? "/";
+    const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+
+    if (code) {
+        const supabase = await createClient();
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (!error) {
+            const forwardedHost = request.headers.get("x-forwarded-host");
+            const isLocalEnv = process.env.NODE_ENV === "development";
+
+            if (isLocalEnv) {
+                return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
+            }
+            if (forwardedHost) {
+                return NextResponse.redirect(`https://${forwardedHost}${next.startsWith("/") ? next : "/"}`);
+            }
+            return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/"}`);
+        }
+    }
+
+    return NextResponse.redirect(`${origin}/auth/login?error=auth_callback_error`);
+}
