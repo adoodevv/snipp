@@ -1,8 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
-import { getSnippetWithVersions, getSnippetsByUserId } from "@/lib/db";
+import { getSnippetWithVersions } from "@/lib/db";
 import { updateSnippetAction } from "@/app/actions/snippetActions";
-import { DashboardLayout } from "@/components/dashboard-layout";
 import Link from "next/link";
 
 interface EditSnippetPageProps {
@@ -36,8 +35,6 @@ export default async function EditSnippetPage({ params, searchParams }: EditSnip
         notFound();
     }
 
-    const { snippets } = await getSnippetsByUserId(user.id, 200, 0);
-
     async function handleSubmit(formData: FormData) {
         "use server";
         const result = await updateSnippetAction(formData);
@@ -52,8 +49,7 @@ export default async function EditSnippetPage({ params, searchParams }: EditSnip
     }
 
     return (
-        <DashboardLayout snippets={snippets} user={user}>
-            <div className="w-full">
+        <div className="w-full">
                 <header className="mb-6 flex justify-between items-center">
                     <Link
                         href={`/snippet/${id}`}
@@ -196,6 +192,5 @@ export default async function EditSnippetPage({ params, searchParams }: EditSnip
                     </form>
                 </div>
             </div>
-        </DashboardLayout>
     );
 }

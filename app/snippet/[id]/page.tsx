@@ -2,12 +2,10 @@ import { redirect, notFound } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import {
     getSnippetWithVersions,
-    getSnippetsByUserId,
     getFoldersByUserId,
     ensureCollabToken,
     validateCollabToken,
 } from "@/lib/db";
-import { DashboardLayout } from "@/components/dashboard-layout";
 import { SnippetContent } from "@/components/snippet-content";
 
 interface SnippetPageProps {
@@ -46,13 +44,7 @@ export default async function SnippetPage({ params, searchParams }: SnippetPageP
         }
     }
 
-    const [snippetsResult, folders] = user?.id
-        ? await Promise.all([
-            getSnippetsByUserId(user.id, 200, 0),
-            getFoldersByUserId(user.id),
-        ])
-        : [{ snippets: [], total: 0 }, []];
-    const snippets = snippetsResult.snippets;
+    const folders = user?.id ? await getFoldersByUserId(user.id) : [];
 
     const userName =
         user?.user_metadata?.full_name ||
@@ -60,8 +52,7 @@ export default async function SnippetPage({ params, searchParams }: SnippetPageP
         "Anonymous";
 
     return (
-        <DashboardLayout snippets={snippets} user={user}>
-            <SnippetContent
+        <SnippetContent
                 snippet={{ ...snippet, collab_token: collabToken }}
                 folders={folders}
                 isOwner={isOwner}
@@ -69,6 +60,5 @@ export default async function SnippetPage({ params, searchParams }: SnippetPageP
                 collabToken={collabToken}
                 userName={userName}
             />
-        </DashboardLayout>
     );
 }

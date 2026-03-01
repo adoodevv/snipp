@@ -1,29 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
-import { createClient } from '@/utils/supabase/client';
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import { getYjsProviderForRoom } from '@liveblocks/yjs';
+import { MonacoBinding } from 'y-monaco';
+import type { Awareness } from 'y-protocols/awareness';
 import { LuCopy, LuCheck } from 'react-icons/lu';
 
-interface Collaborator {
-    id: string;
-    name: string;
-    color: string;
-    cursor?: { lineNumber: number; column: number };
-}
-
-const COLLAB_COLORS = [
-    '#ef4444', '#f97316', '#eab308', '#22c55e',
-    '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
-];
-
-function pickColor(key: string): string {
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
-    return COLLAB_COLORS[Math.abs(hash) % COLLAB_COLORS.length];
-}
+type RoomHooks = {
+    useRoom: () => ReturnType<ReturnType<typeof import('@liveblocks/react').createRoomContext>['useRoom']>;
+    useOthers: () => ReturnType<ReturnType<typeof import('@liveblocks/react').createRoomContext>['useOthers']>;
+    useSelf: () => ReturnType<ReturnType<typeof import('@liveblocks/react').createRoomContext>['useSelf']>;
+    useStatus: () => ReturnType<ReturnType<typeof import('@liveblocks/react').createRoomContext>['useStatus']>;
+};
 
 interface CollaborativeEditorProps {
     snippetId: string;
@@ -33,6 +23,17 @@ interface CollaborativeEditorProps {
     isPublic: boolean;
     readOnly?: boolean;
     collabToken?: string;
+    roomHooks: RoomHooks;
+}
+
+function pickColor(key: string): string {
+    const COLLAB_COLORS = [
+        '#ef4444', '#f97316', '#eab308', '#22c55e',
+        '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'
+    ];
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
+    return COLLAB_COLORS[Math.abs(hash) % COLLAB_COLORS.length];
 }
 
 export function CollaborativeEditor({
@@ -42,221 +43,131 @@ export function CollaborativeEditor({
     userName,
     isPublic,
     readOnly = false,
-    collabToken
+    collabToken,
+    roomHooks,
 }: CollaborativeEditorProps) {
-    const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
-    const [isConnected, setIsConnected] = useState(false);
-    const [connectionFailed, setConnectionFailed] = useState(false);
+    const { useRoom, useOthers, useSelf, useStatus } = roomHooks;
+    const room = useRoom();
+    const others = useOthers();
+    const self = useSelf();
+    const status = useStatus();
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [copied, setCopied] = useState(false);
-    const channelRef = useRef<RealtimeChannel | null>(null);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
-    const decorationsRef = useRef<string[]>([]);
-    const pendingUpdateRef = useRef<string | null>(null);
-    const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const sessionIdRef = useRef<string>('');
-    const pendingInitContentRef = useRef<string | null>(null);
-    const isApplyingRemoteRef = useRef(false);
-    const cursorCacheRef = useRef<Map<string, { lineNumber: number; column: number }>>(new Map());
+    const bindingRef = useRef<MonacoBinding | null>(null);
+    const providerRef = useRef<ReturnType<typeof getYjsProviderForRoom> | null>(null);
+    const awarenessCleanupRef = useRef<(() => void) | null>(null);
+    const lastAwarenessUserRef = useRef<string | null>(null);
+    const [awarenessUsers, setAwarenessUsers] = useState<Map<number, { user?: { name?: string; color?: string } }>>(new Map());
 
-    const updateCursorDecorations = useCallback(() => {
-        if (!editorRef.current) return;
-        const model = editorRef.current.getModel();
-        if (!model) return;
+    const isConnected = status === 'connected';
+    const connectionFailed = status === 'disconnected' || status === 'unavailable';
 
-        const decorations: editor.IModelDeltaDecoration[] = collaborators
-            .filter(c => c.id !== sessionIdRef.current && c.cursor)
-            .map(c => ({
-                range: {
-                    startLineNumber: c.cursor!.lineNumber,
-                    startColumn: c.cursor!.column,
-                    endLineNumber: c.cursor!.lineNumber,
-                    endColumn: c.cursor!.column + 1
-                },
-                options: {
-                    className: `collaborator-cursor-${c.id}`,
-                    beforeContentClassName: 'collaborator-cursor-line',
-                    hoverMessage: { value: c.name },
-                    stickiness: 1
-                }
-            }));
+    const collaborators = [
+        ...others.map((o) => ({
+            id: o.connectionId.toString(),
+            name: (o.info as { name?: string })?.name ?? 'Anonymous',
+            color: (o.info as { color?: string })?.color ?? pickColor(o.connectionId.toString()),
+        })),
+        ...(self ? [{
+            id: self.connectionId.toString(),
+            name: (self.info as { name?: string })?.name ?? userName,
+            color: (self.info as { color?: string })?.color ?? pickColor(self.connectionId.toString()),
+        }] : []),
+    ];
 
-        decorationsRef.current = editorRef.current.deltaDecorations(
-            decorationsRef.current,
-            decorations
-        );
-    }, [collaborators]);
-
-    const applyContentToEditor = useCallback((content: string) => {
-        const model = editorRef.current?.getModel();
-        if (!model || model.getValue() === content) return;
-        const pos = editorRef.current?.getPosition();
-        const cursorToRestore = pos ? { lineNumber: pos.lineNumber, column: pos.column } : null;
-        isApplyingRemoteRef.current = true;
-        try {
-            model.setValue(content);
-            if (editorRef.current && cursorToRestore) {
-                const { lineNumber, column } = cursorToRestore;
-                const lineCount = model.getLineCount();
-                const line = Math.min(lineNumber, lineCount);
-                const lineContent = model.getLineContent(line);
-                const columnClamped = Math.min(column, lineContent.length + 1);
-                editorRef.current.setPosition({ lineNumber: line, column: columnClamped });
-                editorRef.current.revealPosition({ lineNumber: line, column: columnClamped });
-            }
-        } finally {
-            isApplyingRemoteRef.current = false;
-        }
-    }, []);
-
-    const buildCollaboratorsFromPresence = useCallback((state: Record<string, Array<{ id: string; name: string; color: string }>>) => {
-        const list: Collaborator[] = [];
-        for (const key of Object.keys(state)) {
-            const payloads = state[key];
-            if (payloads?.[0]) {
-                const p = payloads[0];
-                const cursor = cursorCacheRef.current.get(p.id);
-                list.push({
-                    id: p.id,
-                    name: p.name,
-                    color: p.color,
-                    cursor
-                });
-            }
-        }
-        return list;
-    }, []);
-
-    // Single channel for content broadcast + presence (cursors, avatars)
-    useEffect(() => {
-        if (!isPublic) return;
-
-        const clientId = crypto.randomUUID();
-        sessionIdRef.current = clientId;
-        const color = pickColor(clientId);
-
-        const supabase = createClient();
-        const channelName = `snippet:${snippetId}`;
-        const channel = supabase.channel(channelName, {
-            config: { broadcast: { self: false } }
-        });
-
-        channel
-            .on('broadcast', { event: 'update' }, (payload) => {
-                const { userId, content } = payload.payload as { userId: string; content: string };
-                if (userId !== sessionIdRef.current && typeof content === 'string') {
-                    applyContentToEditor(content);
-                }
-            })
-            .on('broadcast', { event: 'cursor' }, (payload) => {
-                const { userId, cursor, name, color: c } = payload.payload as {
-                    userId: string;
-                    cursor: { lineNumber: number; column: number };
-                    name: string;
-                    color: string;
-                };
-                if (userId !== sessionIdRef.current && cursor) {
-                    cursorCacheRef.current.set(userId, cursor);
-                    setCollaborators(prev => {
-                        const has = prev.some(x => x.id === userId);
-                        if (has) {
-                            return prev.map(x =>
-                                x.id === userId ? { ...x, cursor, name: name ?? x.name, color: c ?? x.color } : x
-                            );
-                        }
-                        return [...prev, { id: userId, name: name ?? 'Anonymous', color: c ?? '#666', cursor }];
-                    });
-                }
-            })
-            .on('presence', { event: 'sync' }, () => {
-                const state = channel.presenceState() as Record<string, Array<{ id: string; name: string; color: string }>>;
-                setCollaborators(buildCollaboratorsFromPresence(state));
-            })
-            .subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    setIsConnected(true);
-                    setConnectionFailed(false);
-                    channel.track({ id: clientId, name: userName, color });
-                    setCollaborators(prev => {
-                        const hasUs = prev.some(c => c.id === clientId);
-                        if (hasUs) return prev;
-                        return [...prev, { id: clientId, name: userName, color, cursor: undefined }];
-                    });
-                } else if (status === 'CHANNEL_ERROR') {
-                    setIsConnected(false);
-                    setConnectionFailed(true);
-                }
-            });
-
-        channelRef.current = channel;
-
-        return () => {
-            if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
-            supabase.removeChannel(channel);
-            channelRef.current = null;
-            setIsConnected(false);
-        };
-    }, [snippetId, userName, isPublic, applyContentToEditor, buildCollaboratorsFromPresence]);
-
-    useEffect(() => {
-        updateCursorDecorations();
-    }, [collaborators, updateCursorDecorations]);
-
-    const DEBOUNCE_MS = 150;
-
-    const handleEditorMount: OnMount = (editor) => {
+    const handleEditorMount: OnMount = useCallback((editor) => {
         editorRef.current = editor;
 
-        const pending = pendingInitContentRef.current;
-        if (pending != null) {
-            pendingInitContentRef.current = null;
-            isApplyingRemoteRef.current = true;
-            try {
-                editor.getModel()?.setValue(pending);
-            } finally {
-                isApplyingRemoteRef.current = false;
+        const provider = getYjsProviderForRoom(room);
+        providerRef.current = provider;
+        const yDoc = provider.getYDoc();
+        const yText = yDoc.getText('monaco');
+        const model = editor.getModel();
+        if (!model) return;
+
+        const initAndBind = () => {
+            if (yText.length === 0 && initialCode) {
+                yText.insert(0, initialCode);
             }
+            const binding = new MonacoBinding(
+                yText,
+                model,
+                new Set([editor]),
+                provider.awareness as unknown as Awareness
+            );
+            bindingRef.current = binding;
+        };
+
+        const onSync = (isSynced: boolean) => {
+            if (isSynced) {
+                provider.off('sync', onSync);
+                initAndBind();
+            }
+        };
+
+        if (provider.synced) {
+            initAndBind();
+        } else {
+            provider.on('sync', onSync);
         }
 
-        editor.onDidChangeCursorPosition((e) => {
-            const ch = channelRef.current;
-            if (ch?.state === 'joined') {
-                ch.send({
-                    type: 'broadcast',
-                    event: 'cursor',
-                    payload: {
-                        userId: sessionIdRef.current,
-                        cursor: { lineNumber: e.position.lineNumber, column: e.position.column },
-                        name: userName,
-                        color: pickColor(sessionIdRef.current)
-                    }
-                });
-            }
-        });
+        const updateUsers = () => setAwarenessUsers(new Map(provider.awareness.getStates()));
+        updateUsers();
+        provider.awareness.on('change', updateUsers);
+        awarenessCleanupRef.current = () => {
+            provider.off('sync', onSync);
+            provider.awareness.off('change', updateUsers);
+        };
 
         editor.onDidChangeModelContent(() => {
-            if (isApplyingRemoteRef.current) return;
             setHasUnsavedChanges(true);
-            const value = editor.getModel()?.getValue() ?? '';
-            pendingUpdateRef.current = value;
-            if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
-            updateTimeoutRef.current = setTimeout(() => {
-                updateTimeoutRef.current = null;
-                const toSend = pendingUpdateRef.current;
-                pendingUpdateRef.current = null;
-                const ch = channelRef.current;
-                if (toSend !== null && ch?.state === 'joined') {
-                    ch.send({
-                        type: 'broadcast',
-                        event: 'update',
-                        payload: { userId: sessionIdRef.current, content: toSend }
-                    });
-                }
-            }, DEBOUNCE_MS);
         });
-    };
+    }, [room, initialCode]);
+
+    useEffect(() => {
+        const provider = providerRef.current;
+        if (!provider || !self?.info) return;
+        const userInfo = self.info as { name?: string; color?: string };
+        const name = userInfo.name ?? userName;
+        const color = userInfo.color ?? pickColor(self.connectionId.toString());
+        const key = `${name}|${color}`;
+        if (lastAwarenessUserRef.current === key) return;
+        lastAwarenessUserRef.current = key;
+        provider.awareness.setLocalStateField('user', { name, color });
+    }, [self, userName]);
+
+
+    const cursorStyles = useMemo(() => {
+        let css = '';
+        awarenessUsers.forEach((state, clientId) => {
+            const user = state?.user;
+            if (user?.color) {
+                css += `
+                    .yRemoteSelection-${clientId},
+                    .yRemoteSelectionHead-${clientId} {
+                        --user-color: ${user.color};
+                    }
+                    .yRemoteSelectionHead-${clientId}::after {
+                        content: "${(user.name ?? 'Anonymous').replace(/"/g, '\\"')}";
+                    }
+                `;
+            }
+        });
+        return css;
+    }, [awarenessUsers]);
+
+    useEffect(() => {
+        return () => {
+            awarenessCleanupRef.current?.();
+            awarenessCleanupRef.current = null;
+            bindingRef.current?.destroy();
+            bindingRef.current = null;
+            providerRef.current = null;
+        };
+    }, []);
 
     const handleCopy = async () => {
         const code = editorRef.current?.getValue();
@@ -422,22 +333,39 @@ export function CollaborativeEditor({
                 />
             </div>
 
-            <style jsx global>{`
-                ${collaborators.map(c => `
-                    .collaborator-cursor-${c.id} {
-                        background-color: ${c.color}40;
-                        border-left: 2px solid ${c.color};
-                    }
-                `).join('\n')}
-                .collaborator-cursor-line::before {
-                    content: '';
-                    position: absolute;
-                    top: 0;
-                    left: -2px;
-                    width: 2px;
-                    height: 100%;
+            <style dangerouslySetInnerHTML={{ __html: `
+                .yRemoteSelection {
+                    opacity: 0.5;
+                    background-color: var(--user-color);
+                    margin-right: -1px;
                 }
-            `}</style>
+                .yRemoteSelectionHead {
+                    position: absolute;
+                    box-sizing: border-box;
+                    height: 100%;
+                    border-left: 2px solid var(--user-color);
+                }
+                .yRemoteSelectionHead::after {
+                    position: absolute;
+                    top: -1.4em;
+                    left: -2px;
+                    padding: 2px 6px;
+                    background: var(--user-color);
+                    color: #fff;
+                    border: 0;
+                    border-radius: 6px;
+                    border-bottom-left-radius: 0;
+                    line-height: normal;
+                    white-space: nowrap;
+                    font-size: 14px;
+                    font-style: normal;
+                    font-weight: 600;
+                    pointer-events: none;
+                    user-select: none;
+                    z-index: 1000;
+                }
+                ${cursorStyles}
+            `}} />
         </div>
     );
 }

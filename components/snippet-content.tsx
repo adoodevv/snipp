@@ -11,6 +11,7 @@ import { EditSnippetModal } from '@/components/edit-snippet-modal';
 import { SnippetHelpBar } from '@/components/snippet-help-bar';
 import { ShareModal } from '@/components/share-modal';
 import { DeleteModal } from '@/components/delete-modal';
+import { LiveblocksRoomWrapper } from '@/components/liveblocks-room-wrapper';
 
 const CollaborativeEditor = dynamic(
     () => import('@/components/collaborative-editor').then((m) => m.CollaborativeEditor),
@@ -232,17 +233,25 @@ export function SnippetContent({
                         )}
                     </div>
 
-                    {/* Use collaborative editor for public snippets */}
-                    {isPublic ? (
-                        <CollaborativeEditor
-                            snippetId={snippet.id}
-                            initialCode={latestVersion.code}
-                            language={snippet.language || 'javascript'}
-                            userName={userName}
-                            isPublic={true}
-                            readOnly={!hasEditAccess && !isOwner}
-                            collabToken={currentToken}
-                        />
+                    {/* Liveblocks only when user has edit access; view-only = static code */}
+                    {isPublic && (hasEditAccess || isOwner) ? (
+                        <LiveblocksRoomWrapper
+                            roomId={snippet.id}
+                            collabToken={currentToken || undefined}
+                        >
+                            {(roomHooks) => (
+                                <CollaborativeEditor
+                                    snippetId={snippet.id}
+                                    initialCode={latestVersion.code}
+                                    language={snippet.language || 'javascript'}
+                                    userName={userName}
+                                    isPublic={true}
+                                    readOnly={false}
+                                    collabToken={currentToken}
+                                    roomHooks={roomHooks}
+                                />
+                            )}
+                        </LiveblocksRoomWrapper>
                     ) : (
                         <div className="relative">
                             <div className="absolute top-2 right-2 z-10">
