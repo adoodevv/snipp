@@ -1,9 +1,10 @@
 'use client';
 
 import { FaArrowUp } from "react-icons/fa";
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { LuPlus, LuSave, LuChevronDown, LuMessageSquare, LuTrash2 } from "react-icons/lu";
 import { MarkdownContent } from '@/components/markdown-content';
+import { DeleteConversationModal } from '@/components/delete-conversation-modal';
 import type { SnippetWithLatestVersion } from '@/types/database';
 import type { AiConversation } from '@/types/database';
 
@@ -30,9 +31,12 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
     const [saveTitle, setSaveTitle] = useState('');
     const [showConvDropdown, setShowConvDropdown] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [deleteConvTarget, setDeleteConvTarget] = useState<AiConversation | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const streamBufferRef = useRef<string>('');
+    const streamThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const fetchConversations = async () => {
         try {
@@ -57,9 +61,16 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
         el.style.height = Math.min(el.scrollHeight, 200) + 'px';
     }, [message]);
 
+    const scrollToBottom = useCallback(() => {
+        const container = messagesContainerRef.current;
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
+    }, []);
+
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        scrollToBottom();
+    }, [messages, scrollToBottom]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -79,6 +90,11 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
         setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
         setIsLoading(true);
         setError(null);
+        streamBufferRef.current = '';
+        if (streamThrottleRef.current) {
+            clearTimeout(streamThrottleRef.current);
+            streamThrottleRef.current = null;
+        }
 
         try {
             const snippetsForApi = snippets.map((s) => ({
@@ -99,30 +115,95 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                 }),
             });
 
-            const data = await res.json();
-
             if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || 'Failed to get response');
             }
 
-            const modelContent = data.text;
-            setMessages((prev) => [...prev, { role: 'model', content: modelContent }]);
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let modelContent = '';
+            const THROTTLE_MS = 50;
 
-            if (conversationId) {
-                await fetch(`/api/ai/conversations/${conversationId}/messages`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        messages: [
-                            { role: 'user', content: userMessage },
-                            { role: 'model', content: modelContent },
-                        ],
-                    }),
+            const flushToState = () => {
+                const content = streamBufferRef.current;
+                if (content === '') return;
+                setMessages((prev) => {
+                    const next = [...prev];
+                    const last = next[next.length - 1];
+                    if (last?.role === 'model') {
+                        next[next.length - 1] = { ...last, content };
+                    } else {
+                        next.push({ role: 'model', content });
+                    }
+                    return next;
                 });
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => scrollToBottom());
+                });
+            };
+
+            if (reader) {
+                let buffer = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() ?? '';
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const data = JSON.parse(line) as { text?: string; done?: boolean; fullText?: string; error?: string };
+                            if (data.error) throw new Error(data.error);
+                            if (data.text) {
+                                modelContent += data.text;
+                                streamBufferRef.current = modelContent;
+                                if (!streamThrottleRef.current) {
+                                    streamThrottleRef.current = setTimeout(() => {
+                                        streamThrottleRef.current = null;
+                                        flushToState();
+                                    }, THROTTLE_MS);
+                                }
+                            }
+                            if (data.done && data.fullText) {
+                                modelContent = data.fullText;
+                                streamBufferRef.current = modelContent;
+                                if (streamThrottleRef.current) {
+                                    clearTimeout(streamThrottleRef.current);
+                                    streamThrottleRef.current = null;
+                                }
+                                flushToState();
+                            }
+                        } catch {
+                            // skip malformed lines
+                        }
+                    }
+                }
+                if (buffer.trim()) {
+                    try {
+                        const data = JSON.parse(buffer) as { text?: string; fullText?: string };
+                        if (data.text) modelContent += data.text;
+                        if (data.fullText) modelContent = data.fullText;
+                        streamBufferRef.current = modelContent;
+                    } catch {
+                        // ignore
+                    }
+                }
+                if (streamThrottleRef.current) {
+                    clearTimeout(streamThrottleRef.current);
+                    streamThrottleRef.current = null;
+                }
+                flushToState();
             }
+
+            if (!modelContent) {
+                throw new Error('No response from AI');
+            }
+
+            setIsLoading(false);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Something went wrong');
-        } finally {
             setIsLoading(false);
         }
     };
@@ -181,15 +262,33 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
         const title = saveTitle.trim() || 'Untitled';
         setIsSaving(true);
         try {
-            const res = await fetch('/api/ai/conversations', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, messages }),
-            });
-            if (!res.ok) throw new Error('Failed to save');
-            const conv = await res.json();
-            setConversationId(conv.id);
-            setConversationTitle(conv.title);
+            if (conversationId) {
+                const [titleRes, messagesRes] = await Promise.all([
+                    fetch(`/api/ai/conversations/${conversationId}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title }),
+                    }),
+                    fetch(`/api/ai/conversations/${conversationId}/messages`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ messages }),
+                    }),
+                ]);
+                if (!titleRes.ok) throw new Error('Failed to update title');
+                if (!messagesRes.ok) throw new Error('Failed to update messages');
+                setConversationTitle(title);
+            } else {
+                const res = await fetch('/api/ai/conversations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, messages }),
+                });
+                if (!res.ok) throw new Error('Failed to save');
+                const conv = await res.json();
+                setConversationId(conv.id);
+                setConversationTitle(conv.title);
+            }
             setShowSaveModal(false);
             await fetchConversations();
         } catch {
@@ -251,16 +350,9 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={async (e) => {
+                                                    onClick={(e) => {
                                                         e.stopPropagation();
-                                                        if (!confirm('Delete this conversation?')) return;
-                                                        try {
-                                                            await fetch(`/api/ai/conversations/${c.id}`, { method: 'DELETE' });
-                                                            if (conversationId === c.id) handleNewConversation();
-                                                            await fetchConversations();
-                                                        } catch {
-                                                            setError('Failed to delete');
-                                                        }
+                                                        setDeleteConvTarget(c);
                                                     }}
                                                     className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                                                     title="Delete"
@@ -307,10 +399,13 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                 </div>
             )}
 
-            <div className={isFullView ? 'flex-1 flex flex-col min-h-0' : 'flex-1 flex flex-col min-h-[400px]'}>
+            <div className={`relative flex-1 flex flex-col min-h-0 ${!isFullView ? 'min-h-[400px]' : ''}`}>
                 {hasMessages ? (
                     <>
-                        <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 sm:py-6 space-y-3 sm:space-y-4">
+                        <div
+                            ref={messagesContainerRef}
+                            className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 pt-4 sm:pt-6 pb-32 space-y-3 sm:space-y-4 scrollbar-hide"
+                        >
                             {messages.map((m, i) => (
                                 <div
                                     key={i}
@@ -343,11 +438,10 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                                     </div>
                                 </div>
                             )}
-                            <div ref={messagesEndRef} />
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-12">
+                    <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-6 sm:py-12 pb-32">
                         <div className="mb-6 sm:mb-8 text-center">
                             <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 mb-2">
                                 Sni<span className="text-orange-500 text-2xl sm:text-3xl md:text-4xl font-semibold">pp</span> AI
@@ -380,8 +474,9 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                     </div>
                 )}
 
-                <div className="flex-shrink-0 px-3 sm:px-4 pb-6">
-                    <div className="w-full max-w-2xl mx-auto">
+                {/* Fixed input bar - stays at bottom of viewport, content scrolls behind */}
+                <div className="fixed left-0 right-0 bottom-24 lg:bottom-0 lg:left-72 z-40 px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6 pt-2 flex justify-center">
+                    <div className="w-full max-w-5xl">
                         {error && (
                             <p className="text-xs sm:text-sm text-red-500 mb-2">{error}</p>
                         )}
@@ -408,9 +503,27 @@ export function ChatPanel({ onClose, isFullView = false, snippets = [] }: ChatPa
                 </div>
             </div>
 
+            <DeleteConversationModal
+                isOpen={!!deleteConvTarget}
+                onClose={() => setDeleteConvTarget(null)}
+                conversationTitle={deleteConvTarget?.title ?? ''}
+                onConfirm={async () => {
+                    if (!deleteConvTarget) return;
+                    try {
+                        const res = await fetch(`/api/ai/conversations/${deleteConvTarget.id}`, { method: 'DELETE' });
+                        if (!res.ok) throw new Error('Failed to delete');
+                        if (conversationId === deleteConvTarget.id) handleNewConversation();
+                        await fetchConversations();
+                    } catch {
+                        setError('Failed to delete');
+                        throw new Error('Failed to delete');
+                    }
+                }}
+            />
+
             {/* Save modal */}
             {showSaveModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Save conversation</h3>
                         <p className="text-sm text-gray-500 mb-4">Give this conversation a label to find it later.</p>

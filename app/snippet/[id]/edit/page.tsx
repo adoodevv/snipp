@@ -36,7 +36,7 @@ export default async function EditSnippetPage({ params, searchParams }: EditSnip
         notFound();
     }
 
-    const snippets = await getSnippetsByUserId(user.id);
+    const { snippets } = await getSnippetsByUserId(user.id, 200, 0);
 
     async function handleSubmit(formData: FormData) {
         "use server";

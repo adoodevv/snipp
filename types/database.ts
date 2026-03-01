@@ -7,6 +7,13 @@ export interface SnippetVersion {
     created_at: string;
 }
 
+export interface SnippetFolder {
+    id: string;
+    user_id: string;
+    name: string;
+    created_at: string;
+}
+
 export interface Snippet {
     id: string;
     user_id: string;
@@ -14,6 +21,8 @@ export interface Snippet {
     language: string | null;
     is_public: number;
     collab_token: string | null;
+    tags?: string[] | null;
+    folder_id?: string | null;
     created_at: string;
     updated_at: string;
 }

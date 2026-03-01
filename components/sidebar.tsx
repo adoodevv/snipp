@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useMemo } from 'react';
-import { LuSearch, LuMessageCircle, LuPlus } from 'react-icons/lu';
+import { LuSearch, LuMessageCircle, LuPlus, LuCompass } from 'react-icons/lu';
 import { UserNav } from '@/components/auth/user-nav';
 import type { SnippetWithLatestVersion } from '@/types/database';
 import type { User } from '@supabase/supabase-js';
@@ -11,11 +11,9 @@ import type { User } from '@supabase/supabase-js';
 interface SidebarProps {
     snippets: SnippetWithLatestVersion[];
     user: User | null;
-    onChatOpen?: () => void;
-    isChatOpen?: boolean;
 }
 
-export function Sidebar({ snippets, user, onChatOpen, isChatOpen }: SidebarProps) {
+export function Sidebar({ snippets, user }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
@@ -61,17 +59,17 @@ export function Sidebar({ snippets, user, onChatOpen, isChatOpen }: SidebarProps
                     />
                 </div>
 
-                {/* Chat Button */}
-                <button
-                    onClick={onChatOpen}
-                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors duration-200 ${isChatOpen
+                {/* AI Chat Link */}
+                <Link
+                    href="/chat"
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors duration-200 ${pathname === '/chat'
                             ? 'bg-orange-100 text-orange-700 border border-orange-200'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
                         }`}
                 >
                     <LuMessageCircle className="w-4 h-4" />
-                    Chat
-                </button>
+                    AI Chat
+                </Link>
 
                 {/* Create New Snippet Button */}
                 <Link
@@ -80,6 +78,18 @@ export function Sidebar({ snippets, user, onChatOpen, isChatOpen }: SidebarProps
                 >
                     <LuPlus className="w-4 h-4" />
                     Create New Snippet
+                </Link>
+
+                {/* Discover Link */}
+                <Link
+                    href="/discover"
+                    className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-colors duration-200 ${pathname === '/discover'
+                            ? 'bg-orange-100 text-orange-700 border border-orange-200'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200'
+                        }`}
+                >
+                    <LuCompass className="w-4 h-4" />
+                    Discover
                 </Link>
             </div>
 

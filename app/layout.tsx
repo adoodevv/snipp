@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Sora } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
 const sora = Sora({
@@ -25,6 +26,11 @@ export default function RootLayout({
       <body
         className={`${sora.variable} antialiased`}
       >
+        <NextTopLoader
+          color="#ff8c4b"
+          height={3}
+          showSpinner={false}
+        />
         {children}
       </body>
     </html>

@@ -1,9 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { rateLimitAI } from "@/lib/rate-limit";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(request: Request) {
+    const { allowed, retryAfter } = rateLimitAI(request);
+    if (!allowed) {
+        return NextResponse.json(
+            { error: "Too many requests. Please try again later." },
+            { status: 429, headers: { "Retry-After": String(retryAfter ?? 60) } }
+        );
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         return NextResponse.json(

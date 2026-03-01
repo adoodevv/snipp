@@ -3,6 +3,7 @@ import { createClient } from "@/utils/supabase/server";
 import {
     getSnippetWithVersions,
     getSnippetsByUserId,
+    getFoldersByUserId,
     ensureCollabToken,
     validateCollabToken,
 } from "@/lib/db";
@@ -45,7 +46,13 @@ export default async function SnippetPage({ params, searchParams }: SnippetPageP
         }
     }
 
-    const snippets = user?.id ? await getSnippetsByUserId(user.id) : [];
+    const [snippetsResult, folders] = user?.id
+        ? await Promise.all([
+            getSnippetsByUserId(user.id, 200, 0),
+            getFoldersByUserId(user.id),
+        ])
+        : [{ snippets: [], total: 0 }, []];
+    const snippets = snippetsResult.snippets;
 
     const userName =
         user?.user_metadata?.full_name ||
@@ -56,6 +63,7 @@ export default async function SnippetPage({ params, searchParams }: SnippetPageP
         <DashboardLayout snippets={snippets} user={user}>
             <SnippetContent
                 snippet={{ ...snippet, collab_token: collabToken }}
+                folders={folders}
                 isOwner={isOwner}
                 hasEditAccess={hasEditAccess}
                 collabToken={collabToken}

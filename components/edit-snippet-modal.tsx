@@ -5,6 +5,11 @@ import { LuX } from 'react-icons/lu';
 import { updateSnippetAction } from '@/app/actions/snippetActions';
 import { useRouter } from 'next/navigation';
 
+interface SnippetFolder {
+    id: string;
+    name: string;
+}
+
 interface EditSnippetModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -13,11 +18,14 @@ interface EditSnippetModalProps {
         title: string;
         language: string | null;
         is_public: number;
+        tags?: string[] | null;
+        folder_id?: string | null;
     };
+    folders?: SnippetFolder[];
     latestCode: string;
 }
 
-export function EditSnippetModal({ isOpen, onClose, snippet, latestCode }: EditSnippetModalProps) {
+export function EditSnippetModal({ isOpen, onClose, snippet, folders = [], latestCode }: EditSnippetModalProps) {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -89,6 +97,39 @@ export function EditSnippetModal({ isOpen, onClose, snippet, latestCode }: EditS
                             placeholder="My awesome snippet"
                             className="app-input"
                         />
+                    </div>
+
+                    <div>
+                        <label htmlFor="tags" className="app-input-label">
+                            Tags (comma-separated)
+                        </label>
+                        <input
+                            id="tags"
+                            name="tags"
+                            type="text"
+                            defaultValue={snippet.tags?.join(', ') ?? ''}
+                            placeholder="react, hooks, utils"
+                            className="app-input"
+                        />
+                    </div>
+
+                    <div>
+                        <label htmlFor="folderId" className="app-input-label">
+                            Folder
+                        </label>
+                        <select
+                            id="folderId"
+                            name="folderId"
+                            className="app-input"
+                            defaultValue={snippet.folder_id ?? ''}
+                        >
+                            <option value="">No folder</option>
+                            {folders.map((f) => (
+                                <option key={f.id} value={f.id}>
+                                    {f.name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
                     <div>

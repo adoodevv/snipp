@@ -5,6 +5,7 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { createClient } from '@/utils/supabase/client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import { LuCopy, LuCheck } from 'react-icons/lu';
 
 interface Collaborator {
     id: string;
@@ -49,6 +50,7 @@ export function CollaborativeEditor({
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [copied, setCopied] = useState(false);
     const channelRef = useRef<RealtimeChannel | null>(null);
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
     const decorationsRef = useRef<string[]>([]);
@@ -127,7 +129,7 @@ export function CollaborativeEditor({
         return list;
     }, []);
 
-    // Connect to Supabase Realtime
+    // Single channel for content broadcast + presence (cursors, avatars)
     useEffect(() => {
         if (!isPublic) return;
 
@@ -177,6 +179,11 @@ export function CollaborativeEditor({
                     setIsConnected(true);
                     setConnectionFailed(false);
                     channel.track({ id: clientId, name: userName, color });
+                    setCollaborators(prev => {
+                        const hasUs = prev.some(c => c.id === clientId);
+                        if (hasUs) return prev;
+                        return [...prev, { id: clientId, name: userName, color, cursor: undefined }];
+                    });
                 } else if (status === 'CHANNEL_ERROR') {
                     setIsConnected(false);
                     setConnectionFailed(true);
@@ -249,6 +256,18 @@ export function CollaborativeEditor({
                 }
             }, DEBOUNCE_MS);
         });
+    };
+
+    const handleCopy = async () => {
+        const code = editorRef.current?.getValue();
+        if (!code) return;
+        try {
+            await navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Copy failed:', err);
+        }
     };
 
     const handleSave = async () => {
@@ -364,7 +383,25 @@ export function CollaborativeEditor({
                 </div>
             )}
 
-            <div className="rounded-lg overflow-hidden border border-gray-200">
+            <div className="rounded-lg overflow-hidden border border-gray-200 relative group">
+                <button
+                    type="button"
+                    onClick={handleCopy}
+                    className="absolute top-2 right-2 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-700/90 hover:bg-gray-600 text-white text-xs font-medium transition-colors"
+                    title="Copy code"
+                >
+                    {copied ? (
+                        <>
+                            <LuCheck className="w-3.5 h-3.5" />
+                            Copied!
+                        </>
+                    ) : (
+                        <>
+                            <LuCopy className="w-3.5 h-3.5" />
+                            Copy
+                        </>
+                    )}
+                </button>
                 <Editor
                     key={snippetId}
                     height="min(400px, 60vh)"

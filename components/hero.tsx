@@ -14,15 +14,40 @@ export default function Hero({ user }: { user: User | null }) {
                 }}
             />
 
-            <header className="relative w-full flex justify-between items-center p-4 sm:p-8 z-10 gap-4">
+            <header className="relative w-full flex justify-between items-start p-4 sm:p-8 z-10 gap-4">
                 <h1 className="text-2xl sm:text-4xl font-bold shrink-0">
                     Sni
                     <span className="text-orange-500 text-2xl sm:text-4xl font-bold">pp</span>
                 </h1>
-                <div className="flex items-center gap-4 sm:gap-6 md:gap-8 min-w-0">
-                    <Link href="#" className="hidden md:inline-block text-lg md:text-2xl lg:text-3xl font-semibold hover:-translate-y-1 transition-all duration-300">Collaborate</Link>
-                    <Link href="#" className="hidden md:inline-block text-lg md:text-2xl lg:text-3xl font-semibold hover:-translate-y-1 transition-all duration-300">Discover</Link>
-                    <Link href="#" className="hidden md:inline-block text-lg md:text-2xl lg:text-3xl font-semibold hover:-translate-y-1 transition-all duration-300">Features</Link>
+                <div className="flex flex-col items-end gap-0.5 min-w-0">
+                    <Link
+                        href="/"
+                        className="text-2xl sm:text-4xl font-semibold hover:-translate-y-1 transition-all duration-300"
+                    >
+                        App
+                    </Link>
+                    <Link
+                        href="/discover"
+                        className="text-2xl sm:text-4xl font-semibold hover:-translate-y-1 transition-all duration-300"
+                    >
+                        Discover
+                    </Link>
+                    <Link
+                        href="https://github.com/adoodevv/snipp#readme"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-2xl sm:text-4xl font-semibold hover:-translate-y-1 transition-all duration-300"
+                    >
+                        Docs
+                    </Link>
+                    <Link
+                        href="https://github.com/adoodevv/snipp"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-2xl sm:text-4xl font-semibold hover:-translate-y-1 transition-all duration-300"
+                    >
+                        Collaborate
+                    </Link>
                     {user ? (
                         <div className="w-full min-w-0 max-w-[180px] sm:max-w-[220px]">
                             <UserNav user={user} />

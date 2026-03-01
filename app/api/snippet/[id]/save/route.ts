@@ -1,11 +1,20 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { NextResponse } from "next/server";
+import { rateLimitSave } from "@/lib/rate-limit";
 
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const { allowed, retryAfter } = rateLimitSave(request);
+    if (!allowed) {
+        return NextResponse.json(
+            { error: "Too many save requests. Please try again later." },
+            { status: 429, headers: { "Retry-After": String(retryAfter ?? 60) } }
+        );
+    }
+
     const { id } = await params;
 
     const url = new URL(request.url);

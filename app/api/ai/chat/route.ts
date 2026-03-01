@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextResponse } from "next/server";
+import { rateLimitAI } from "@/lib/rate-limit";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -8,6 +9,14 @@ When the user asks about their snippets, search context, or code-related questio
 If snippets context is provided, use it to answer questions about their code. Otherwise, give general coding advice.`;
 
 export async function POST(request: Request) {
+    const { allowed, retryAfter } = rateLimitAI(request);
+    if (!allowed) {
+        return NextResponse.json(
+            { error: "Too many requests. Please try again later." },
+            { status: 429, headers: { "Retry-After": String(retryAfter ?? 60) } }
+        );
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         return NextResponse.json(
@@ -57,11 +66,37 @@ export async function POST(request: Request) {
             ],
         });
 
-        const result = await chat.sendMessage(message);
-        const response = result.response;
-        const text = response.text();
+        const result = await chat.sendMessageStream(message);
 
-        return NextResponse.json({ text });
+        const stream = new ReadableStream({
+            async start(controller) {
+                const encoder = new TextEncoder();
+                try {
+                    let fullText = "";
+                    for await (const chunk of result.stream) {
+                        const c = chunk as { text?: () => string };
+                        const text = c.text?.() ?? "";
+                        if (text) {
+                            fullText += text;
+                            controller.enqueue(encoder.encode(JSON.stringify({ text }) + "\n"));
+                        }
+                    }
+                    controller.enqueue(encoder.encode(JSON.stringify({ done: true, fullText }) + "\n"));
+                } catch (err) {
+                    controller.enqueue(encoder.encode(JSON.stringify({ error: err instanceof Error ? err.message : "Stream error" }) + "\n"));
+                } finally {
+                    controller.close();
+                }
+            },
+        });
+
+        return new Response(stream, {
+            headers: {
+                "Content-Type": "application/x-ndjson",
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+            },
+        });
     } catch (error) {
         console.error("Gemini chat error:", error);
         return NextResponse.json(

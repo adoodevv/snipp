@@ -17,6 +17,22 @@ export async function createSnippet(formData: FormData): Promise<
     const language = formData.get("language") as string;
     const code = formData.get("code") as string;
     const isPublic = formData.get("isPublic") === "on" ? 1 : 0;
+    const tagsRaw = formData.get("tags") as string | null;
+    const folderId = formData.get("folderId") as string | null;
+    const newFolderName = formData.get("newFolderName") as string | null;
+
+    const tags = tagsRaw
+        ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
+        : [];
+    let folderIdOrNull = folderId?.trim() || null;
+    if (!folderIdOrNull && newFolderName?.trim()) {
+        const { data: folder } = await supabase
+            .from("snippet_folders")
+            .insert({ user_id: user.id, name: newFolderName.trim() })
+            .select("id")
+            .single();
+        if (folder) folderIdOrNull = folder.id;
+    }
 
     if (!title?.trim()) return { success: false, error: "Title is required" };
     if (!code?.trim()) return { success: false, error: "Code is required" };
@@ -28,6 +44,8 @@ export async function createSnippet(formData: FormData): Promise<
             title: title.trim(),
             language: language || null,
             is_public: isPublic,
+            tags: tags.length ? tags : null,
+            folder_id: folderIdOrNull,
         })
         .select("id")
         .single();
@@ -71,6 +89,13 @@ export async function updateSnippetAction(formData: FormData): Promise<
     const code = formData.get("code") as string;
     const changeDescription = formData.get("changeDescription") as string | null;
     const isPublic = formData.get("isPublic") === "on" ? 1 : 0;
+    const tagsRaw = formData.get("tags") as string | null;
+    const folderId = formData.get("folderId") as string | null;
+
+    const tags = tagsRaw
+        ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean)
+        : [];
+    const folderIdOrNull = folderId?.trim() || null;
 
     if (!snippetId) return { success: false, error: "Snippet ID is required" };
     if (!title?.trim()) return { success: false, error: "Title is required" };
@@ -115,6 +140,8 @@ export async function updateSnippetAction(formData: FormData): Promise<
             title: title.trim(),
             language: language || null,
             is_public: isPublic,
+            tags: tags.length ? tags : null,
+            folder_id: folderIdOrNull,
             updated_at: new Date().toISOString(),
         })
         .eq("id", snippetId);

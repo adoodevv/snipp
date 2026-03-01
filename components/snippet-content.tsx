@@ -1,16 +1,21 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CgChevronLeft } from 'react-icons/cg';
 import { HiOutlineShare } from 'react-icons/hi';
-import { LuTrash2 } from 'react-icons/lu';
+import { LuTrash2, LuCopy, LuCheck } from 'react-icons/lu';
 import { EditSnippetModal } from '@/components/edit-snippet-modal';
 import { SnippetHelpBar } from '@/components/snippet-help-bar';
-import { CollaborativeEditor } from '@/components/collaborative-editor';
 import { ShareModal } from '@/components/share-modal';
 import { DeleteModal } from '@/components/delete-modal';
+
+const CollaborativeEditor = dynamic(
+    () => import('@/components/collaborative-editor').then((m) => m.CollaborativeEditor),
+    { ssr: false }
+);
 
 interface SnippetVersion {
     id: string;
@@ -20,12 +25,19 @@ interface SnippetVersion {
     created_at: string;
 }
 
+interface SnippetFolder {
+    id: string;
+    name: string;
+}
+
 interface SnippetData {
     id: string;
     title: string;
     language: string | null;
     is_public: number;
     collab_token: string | null;
+    tags?: string[] | null;
+    folder_id?: string | null;
     created_at: string;
     updated_at: string;
     versions: SnippetVersion[];
@@ -33,14 +45,49 @@ interface SnippetData {
 
 interface SnippetContentProps {
     snippet: SnippetData;
+    folders?: SnippetFolder[];
     isOwner: boolean;
     hasEditAccess: boolean;
     collabToken: string;
     userName?: string;
 }
 
+function CopyButton({ code }: { code: string }) {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(code);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch (err) {
+            console.error('Copy failed:', err);
+        }
+    };
+    return (
+        <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-700/90 hover:bg-gray-600 text-white text-xs font-medium transition-colors"
+            title="Copy code"
+        >
+            {copied ? (
+                <>
+                    <LuCheck className="w-3.5 h-3.5" />
+                    Copied!
+                </>
+            ) : (
+                <>
+                    <LuCopy className="w-3.5 h-3.5" />
+                    Copy
+                </>
+            )}
+        </button>
+    );
+}
+
 export function SnippetContent({
     snippet,
+    folders = [],
     isOwner,
     hasEditAccess,
     collabToken,
@@ -197,9 +244,14 @@ export function SnippetContent({
                             collabToken={currentToken}
                         />
                     ) : (
-                        <pre className="font-mono text-sm sm:text-base bg-gray-900 text-white p-4 sm:p-6 rounded-lg overflow-x-auto">
-                            <code>{latestVersion.code}</code>
-                        </pre>
+                        <div className="relative">
+                            <div className="absolute top-2 right-2 z-10">
+                                <CopyButton code={latestVersion.code} />
+                            </div>
+                            <pre className="font-mono text-sm sm:text-base bg-gray-900 text-white p-4 sm:p-6 rounded-lg overflow-x-auto">
+                                <code>{latestVersion.code}</code>
+                            </pre>
+                        </div>
                     )}
                 </div>
 
@@ -245,7 +297,10 @@ export function SnippetContent({
                         title: snippet.title,
                         language: snippet.language,
                         is_public: snippet.is_public,
+                        tags: snippet.tags,
+                        folder_id: snippet.folder_id,
                     }}
+                    folders={folders}
                     latestCode={latestVersion.code}
                 />
             )}
