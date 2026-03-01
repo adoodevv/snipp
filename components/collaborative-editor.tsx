@@ -26,6 +26,8 @@ interface CollaborativeEditorProps {
     roomHooks: RoomHooks;
 }
 
+type CollaboratorUser = { connectionId: number; info?: { name?: string; color?: string } };
+
 function pickColor(key: string): string {
     const COLLAB_COLORS = [
         '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -48,8 +50,8 @@ export function CollaborativeEditor({
 }: CollaborativeEditorProps) {
     const { useRoom, useOthers, useSelf, useStatus } = roomHooks;
     const room = useRoom();
-    const others = useOthers();
-    const self = useSelf();
+    const others = useOthers() as CollaboratorUser[];
+    const self = useSelf() as CollaboratorUser | null;
     const status = useStatus();
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
@@ -63,23 +65,24 @@ export function CollaborativeEditor({
     const [awarenessUsers, setAwarenessUsers] = useState<Map<number, { user?: { name?: string; color?: string } }>>(new Map());
 
     const isConnected = status === 'connected';
-    const connectionFailed = status === 'disconnected' || status === 'unavailable';
+    const connectionFailed = status === 'reconnecting';
 
     const collaborators = [
         ...others.map((o) => ({
             id: o.connectionId.toString(),
-            name: (o.info as { name?: string })?.name ?? 'Anonymous',
-            color: (o.info as { color?: string })?.color ?? pickColor(o.connectionId.toString()),
+            name: o.info?.name ?? 'Anonymous',
+            color: o.info?.color ?? pickColor(o.connectionId.toString()),
         })),
         ...(self ? [{
             id: self.connectionId.toString(),
-            name: (self.info as { name?: string })?.name ?? userName,
-            color: (self.info as { color?: string })?.color ?? pickColor(self.connectionId.toString()),
+            name: self.info?.name ?? userName,
+            color: self.info?.color ?? pickColor(self.connectionId.toString()),
         }] : []),
     ];
 
     const handleEditorMount: OnMount = useCallback((editor) => {
         editorRef.current = editor;
+        if (!room) return;
 
         const provider = getYjsProviderForRoom(room);
         providerRef.current = provider;
@@ -114,7 +117,7 @@ export function CollaborativeEditor({
             provider.on('sync', onSync);
         }
 
-        const updateUsers = () => setAwarenessUsers(new Map(provider.awareness.getStates()));
+        const updateUsers = () => setAwarenessUsers(new Map(provider.awareness.getStates()) as Map<number, { user?: { name?: string; color?: string } }>);
         updateUsers();
         provider.awareness.on('change', updateUsers);
         awarenessCleanupRef.current = () => {
@@ -130,7 +133,7 @@ export function CollaborativeEditor({
     useEffect(() => {
         const provider = providerRef.current;
         if (!provider || !self?.info) return;
-        const userInfo = self.info as { name?: string; color?: string };
+        const userInfo = self.info;
         const name = userInfo.name ?? userName;
         const color = userInfo.color ?? pickColor(self.connectionId.toString());
         const key = `${name}|${color}`;
