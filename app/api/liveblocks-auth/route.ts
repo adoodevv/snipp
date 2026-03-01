@@ -3,8 +3,6 @@ import { Liveblocks } from "@liveblocks/node";
 import { createClient } from "@/utils/supabase/server";
 import { validateCollabToken } from "@/lib/db";
 
-export const maxDuration = 30;
-
 const liveblocks = new Liveblocks({
     secret: process.env.LIVEBLOCKS_SECRET_KEY!,
 });
